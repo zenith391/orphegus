@@ -56,7 +56,7 @@ pub fn karplusStrong(allocator: std.mem.Allocator, frequency: f32, writer: anyty
 }
 
 pub fn main() !void {
-    const file = try std.fs.cwd().createFile("test.wav", .{});
+    const file = try std.fs.cwd().createFile("output/test.wav", .{});
     defer file.close();
     
     var buffered = std.io.bufferedWriter(file.writer());
