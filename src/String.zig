@@ -5,12 +5,12 @@
 //! This could be called the "Bilbao-Torin" algorithm
 const std = @import("std");
 
-/// Value of the transverse displacement of the string in a single polarization
+/// Values of the transverse displacement of the string in a single polarization
 u: []const f32,
 params: Parameters,
 
 pub const Parameters = struct {
-    /// The length of the sting at rest, in m
+    /// The length of the string at rest, in m
     rest_length: f32,
     /// Linear mass density, in kg.m-1
     density: f32,
@@ -20,15 +20,16 @@ pub const Parameters = struct {
     young_modulus: f32,
     /// String moment of inertia
     /// It is equal to pi * r^4 / 4 for strings of circular cross-sections
-    moment_inertia: f32,
+    moment_of_inertia: f32,
     
     // Loss parameters introduced by the paper for the purposes of this specfic
-    // algorithm. They need to be acquired experimentally.
+    // algorithm. They need to be acquired experimentally by a regression to
+    // find the values that give the best accuracy.
     loss_param_0: f32,
     loss_param_1: f32,
 };
 
-pub fn init(allocator: std.mem.Allocator, grid_points: u32, time_step: f32, params: Parameters) String {
+pub fn init(allocator: std.mem.Allocator, grid_points: u32, time_step: f32, params: Parameters) !String {
     const u = try allocator.alloc(f32, grid_points);
     // const grid_spacing = parameter.rest_length / @as(f32, @floatFromInt(grid_points));
     return .{

@@ -1,5 +1,6 @@
 const std = @import("std");
 const lib = @import("synthesis");
+const String = @import("SimplifiedString.zig");
 
 pub fn karplusStrong(allocator: std.mem.Allocator, frequency: f32, writer: anytype) !void {
     var noise_node = lib.WhiteNoiseNode.init(allocator);
@@ -51,6 +52,25 @@ pub fn karplusStrong(allocator: std.mem.Allocator, frequency: f32, writer: anyty
     defer reverb.deinit();
     // try reverb.node.dependencies.append(&sum_node.node);
     try reverb.node.dependencies.append(&reverb_sum.node);
+    
+    var string = try String.init(allocator, .{
+        .rest_length = 0.1, // 10 cm at rest
+        .density = 0.1,
+        .tension = 1.0,
+        .moment_of_inertia = undefined,
+        .stiffness = 2,
+        .friction = 0.02,
+        .springs = 16,
+    });
+    defer string.deinit(allocator);
+    
+    // On pince le milieu de la corde
+    string.u[string.params.springs / 2] = 0.01;
+    for (0..100) |i| {
+        std.log.info("TIME AT {d}", .{i});
+        string.dump();
+        string.update(0.01);
+    }
     
     try lib.exportToWav(&reverb.node, 5, writer);
 }

@@ -1,4 +1,5 @@
-# Synthèse de sons de cordes de guitare
+# Orphegus Guitar Synthesis
 
 ## Sources
-- https://pismin.com/10.17743/jaes.2015.0023
+- Numerical Modeling and Sound Synthesis for Articulated String/Fretboard Interaction
+  (https://www.researchgate.net/publication/273945726_Numerical_Modeling_and_Sound_Synthesis_for_Articulated_StringFretboard_Interactions)
