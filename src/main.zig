@@ -54,23 +54,42 @@ pub fn karplusStrong(allocator: std.mem.Allocator, frequency: f32, writer: anyty
     try reverb.node.dependencies.append(&reverb_sum.node);
     
     var string = try String.init(allocator, .{
-        .rest_length = 0.1, // 10 cm at rest
-        .density = 0.1,
+        .rest_length = 0.65, // 65 cm at rest
+        .density = 0.00075, // 75 g/m, c.f. https://forums.ernieball.com/threads/linear-density-stats-for-power-slinky-strings.59720/
         .tension = 1.0,
         .moment_of_inertia = undefined,
-        .stiffness = 2,
-        .friction = 0.02,
-        .springs = 16,
+        .stiffness = 4,
+        .friction = 0.00001,
+        .springs = 250,
     });
     defer string.deinit(allocator);
     
     // On pince le milieu de la corde
-    string.u[string.params.springs / 2] = 0.01;
-    for (0..100) |i| {
-        std.log.info("TIME AT {d}", .{i});
-        string.dump();
-        string.update(0.01);
+    // string.u[string.params.springs / 2] = 0.001;
+    for (0..string.params.springs) |i| {
+        const amplitude = 0.01;
+        const x = @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(string.params.springs));
+        string.u[i] = amplitude * @sin(2 * std.math.pi * 2 * x);
     }
+    
+    var file = try std.fs.cwd().createFile("string_analysis.csv", .{ });
+    defer file.close();
+    const raw_file_writer = file.writer();
+    var buf_writer = std.io.bufferedWriter(raw_file_writer);
+    const file_writer = buf_writer.writer();
+    for (0..10000) |i| {
+        if (i % 1000 == 0) std.log.info("TIME AT {d}", .{i});
+        // string.dump();
+        for (string.u, 0..) |u, j| {
+            try file_writer.print("{}", .{ u });
+            if (j < string.u.len - 1) {
+                try file_writer.print(",", .{});
+            }
+        }
+        try file_writer.writeAll("\n");
+        string.update(0.0001);
+    }
+    try buf_writer.flush();
     
     try lib.exportToWav(&reverb.node, 5, writer);
 }
