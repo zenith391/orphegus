@@ -37,13 +37,7 @@ pub fn init(allocator: std.mem.Allocator, params: Parameters) !String {
     @memset(u, 0.0);
     @memset(up, 0.0);
 
-    return .{
-        .u = u,
-        .next_u = next_u,
-        .up = up,
-        .upp = upp,
-        .params = params
-    };
+    return .{ .u = u, .next_u = next_u, .up = up, .upp = upp, .params = params };
 }
 
 /// Update using Euler's method
@@ -52,16 +46,14 @@ pub fn update(self: *String, time_step: f64) void {
     const mass = l0 * self.params.density;
     for (0..self.params.springs) |i| {
         // Valeurs de u[i-1] et u[i+1], en considérant que u[-1] = 0 et u[n] = 0
-        const prev_u = if (i > 0) self.u[i-1] else 0;
-        const next_u = if (i < self.params.springs - 1) self.u[i+1] else 0;
+        const prev_u = if (i > 0) self.u[i - 1] else 0;
+        const next_u = if (i < self.params.springs - 1) self.u[i + 1] else 0;
 
-        const friction_force = -self.params.friction * self.up[i];
+        const friction_force = -self.params.friction * self.up[i] * l0 / self.params.rest_length;
         const lprev = @sqrt(l0 * l0 + (self.u[i] - prev_u) * (self.u[i] - prev_u)) - l0;
-        const spring_1_force = -self.params.stiffness * lprev * (self.u[i] - prev_u)
-            / (lprev + l0);
+        const spring_1_force = -self.params.stiffness * lprev * (self.u[i] - prev_u) / (lprev + l0);
         const lnext = @sqrt(l0 * l0 + (next_u - self.u[i]) * (next_u - self.u[i])) - l0;
-        const spring_2_force = self.params.stiffness * lnext * (next_u - self.u[i])
-            / (lnext + l0);
+        const spring_2_force = self.params.stiffness * lnext * (next_u - self.u[i]) / (lnext + l0);
         // const spring_1_force = std.math.sign(prev_u - self.u[i]) * self.params.stiffness
         //     * (@sqrt(l0 * l0 + @abs(self.u[i] * self.u[i] - prev_u * prev_u)) - l0);
         // const spring_2_force = std.math.sign(next_u - self.u[i]) * self.params.stiffness
@@ -75,7 +67,7 @@ pub fn update(self: *String, time_step: f64) void {
 }
 
 pub fn dump(self: String) void {
-    std.debug.print("u: {d:.4}\n", .{ self.u });
+    std.debug.print("u: {d:.4}\n", .{self.u});
     // std.debug.print("up: {d}\n", .{ self.up });
     // std.debug.print("upp: {d}\n", .{ self.upp });
 }
