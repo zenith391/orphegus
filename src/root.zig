@@ -4,20 +4,22 @@ const testing = std.testing;
 pub const AudioBuffer = struct {
     samples: []f32,
     sample_rate: u32,
-    
+
     pub fn init(allocator: std.mem.Allocator, size: usize, sample_rate: u32) !AudioBuffer {
         const samples = try allocator.alloc(f32, size);
-        return AudioBuffer { .samples = samples, .sample_rate = sample_rate };
+        return AudioBuffer{ .samples = samples, .sample_rate = sample_rate };
     }
-    
+
     pub fn deinit(self: AudioBuffer, allocator: std.mem.Allocator) void {
         allocator.free(self.samples);
     }
-    
+
     pub fn writeAsPCM(self: AudioBuffer, max: u32, writer: anytype) !void {
         // Conversion de tous les floats en entiers
         for (self.samples, 0..) |sample, i| {
             if (i >= max) break;
+            std.debug.assert(!std.math.isNan(sample));
+            std.debug.assert(std.math.isFinite(sample));
             const byte: i16 = @intFromFloat(@min(1, @max(-1, sample)) * std.math.maxInt(i16));
             // NOTE: c'est potentiellement très très lent d'écrire octet à octet
             try writer.writeInt(i16, byte, .little);
@@ -41,9 +43,9 @@ pub const DelayLine = struct {
     do_initial: bool = false,
     node: AudioNode,
     previous_batch: []f32,
-    
+
     pub fn init(allocator: std.mem.Allocator, delay: f32) DelayLine {
-        const line = DelayLine {
+        const line = DelayLine{
             .delay = delay,
             .node = AudioNode.from(DelayLine, allocator),
             .previous_batch = allocator.alloc(f32, @intFromFloat(44100.0 * delay)) catch unreachable,
@@ -51,7 +53,7 @@ pub const DelayLine = struct {
         @memset(line.previous_batch, 0);
         return line;
     }
-    
+
     pub fn process(node: *AudioNode, sample_rate: u32, n_samples: usize) void {
         const self: *DelayLine = @fieldParentPtr("node", node);
         const dependency = node.dependencies.items[0];
@@ -74,7 +76,7 @@ pub const DelayLine = struct {
             }
         }
     }
-    
+
     pub fn deinit(self: *DelayLine) void {
         // self.buffer.deinit();
         self.node.deinit();
@@ -89,13 +91,13 @@ pub const LowPassNode = struct {
     last_sample: f32 = 0.0,
 
     pub fn init(allocator: std.mem.Allocator, cutoff: f32) LowPassNode {
-        const low_pass = LowPassNode {
+        const low_pass = LowPassNode{
             .node = AudioNode.from(LowPassNode, allocator),
             .cutoff = cutoff,
         };
         return low_pass;
     }
-    
+
     pub fn process(node: *AudioNode, sample_rate: u32, n_samples: usize) void {
         const self: *LowPassNode = @fieldParentPtr("node", node);
         const start = node.getLastSampleIndex();
@@ -109,7 +111,7 @@ pub const LowPassNode = struct {
             self.last_sample = out_sample;
         }
     }
-    
+
     pub fn deinit(self: *LowPassNode) void {
         self.node.deinit();
     }
@@ -120,16 +122,16 @@ pub const WhiteNoiseNode = struct {
     prng: std.Random.DefaultPrng,
     stop_time: f32,
     gain: f32 = 1.0,
-    
+
     pub fn init(allocator: std.mem.Allocator) WhiteNoiseNode {
-        const sine_node = WhiteNoiseNode {
+        const sine_node = WhiteNoiseNode{
             .node = AudioNode.from(WhiteNoiseNode, allocator),
             .prng = std.Random.DefaultPrng.init(0),
             .stop_time = 1.0,
         };
         return sine_node;
     }
-    
+
     pub fn process(node: *AudioNode, sample_rate: u32, n_samples: usize) void {
         const self: *WhiteNoiseNode = @fieldParentPtr("node", node);
         const start = node.getLastSampleIndex();
@@ -146,7 +148,7 @@ pub const WhiteNoiseNode = struct {
             }
         }
     }
-    
+
     pub fn deinit(self: *WhiteNoiseNode) void {
         self.node.deinit();
     }
@@ -156,16 +158,16 @@ pub const SineNode = struct {
     node: AudioNode,
     frequency: f32,
     gain: f32,
-    
+
     pub fn init(allocator: std.mem.Allocator, frequency: f32) SineNode {
-        const sine_node = SineNode {
+        const sine_node = SineNode{
             .node = AudioNode.from(SineNode, allocator),
             .frequency = frequency,
             .gain = 1.0,
         };
         return sine_node;
     }
-    
+
     pub fn process(node: *AudioNode, sample_rate: u32, n_samples: usize) void {
         const self: *SineNode = @fieldParentPtr("node", node);
         const start = node.getLastSampleIndex();
@@ -175,7 +177,7 @@ pub const SineNode = struct {
             node.buffer.appendAssumeCapacity(sample);
         }
     }
-    
+
     pub fn deinit(self: *SineNode) void {
         self.node.deinit();
     }
@@ -183,14 +185,14 @@ pub const SineNode = struct {
 
 pub const SumNode = struct {
     node: AudioNode,
-    
+
     pub fn init(allocator: std.mem.Allocator) SumNode {
-        const sum_node = SumNode {
+        const sum_node = SumNode{
             .node = AudioNode.from(SumNode, allocator),
         };
         return sum_node;
     }
-    
+
     pub fn process(node: *AudioNode, sample_rate: u32, n_samples: usize) void {
         const self: *SumNode = @fieldParentPtr("node", node);
         _ = self;
@@ -204,7 +206,7 @@ pub const SumNode = struct {
             node.buffer.appendAssumeCapacity(sample);
         }
     }
-    
+
     pub fn deinit(self: *SumNode) void {
         self.node.deinit();
     }
@@ -219,11 +221,11 @@ pub const AudioNode = struct {
     /// TODO: bounded array instead?
     dependencies: std.ArrayList(*AudioNode),
     vtable: *const VTable,
-    
+
     pub const VTable = struct {
-        process: *const fn(*AudioNode, sample_rate: u32, n_samples: usize) void,
+        process: *const fn (*AudioNode, sample_rate: u32, n_samples: usize) void,
         // deinit: *const fn(*AudioNode) void,
-        
+
         pub fn from(comptime T: type) VTable {
             return .{
                 .process = &T.process,
@@ -231,7 +233,7 @@ pub const AudioNode = struct {
             };
         }
     };
-    
+
     pub fn from(comptime T: type, allocator: std.mem.Allocator) AudioNode {
         const vtable = comptime VTable.from(T);
         return .{
@@ -241,12 +243,12 @@ pub const AudioNode = struct {
             .vtable = &vtable,
         };
     }
-    
+
     /// Process a given number of samples.
     pub fn processNSamples(self: *AudioNode, sample_rate: u32, n_samples: usize) void {
         self.vtable.process(self, sample_rate, n_samples);
     }
-    
+
     /// Process until the specified point in time is reached.
     pub fn processUntil(self: *AudioNode, sample_rate: u32, sample_index: usize) void {
         const last_sample_index = self.first_buffered_sample + self.buffer.items.len;
@@ -254,12 +256,12 @@ pub const AudioNode = struct {
             self.processNSamples(sample_rate, sample_index - last_sample_index + 1);
         }
     }
-    
+
     pub fn getSample(self: *AudioNode, sample_index: usize) f32 {
         const index = sample_index - self.first_buffered_sample;
         return self.buffer.items[index];
     }
-    
+
     pub fn consumeSample(self: *AudioNode, sample_rate: u32, sample_index: usize) f32 {
         if (self.getLastSampleIndex() > sample_index) {
             // std.debug.assert(sample_index == self.first_buffered_sample);
@@ -272,18 +274,18 @@ pub const AudioNode = struct {
             return self.consumeSample(sample_rate, sample_index);
         }
     }
-    
+
     pub fn getLastSampleIndex(self: *AudioNode) usize {
         return self.first_buffered_sample + self.buffer.items.len;
     }
-    
+
     pub fn flushToAudioBuffer(self: *AudioNode, start_sample: usize, audio_buffer: AudioBuffer) void {
         const len = audio_buffer.samples.len;
-        @memcpy(audio_buffer.samples, self.buffer.items[start_sample..start_sample+len]);
+        @memcpy(audio_buffer.samples, self.buffer.items[start_sample .. start_sample + len]);
         // self.first_buffered_sample += len;
         // self.buffer.replaceRange(0, len, &.{}) catch unreachable;
     }
-    
+
     pub fn reserveSpace(self: *AudioNode, samples: usize) !void {
         if (self.buffer.capacity - self.buffer.items.len < samples) {
             try self.buffer.ensureUnusedCapacity(samples);
@@ -292,7 +294,7 @@ pub const AudioNode = struct {
             }
         }
     }
-    
+
     pub fn deinit(self: *AudioNode) void {
         self.buffer.deinit();
         self.dependencies.deinit();
@@ -323,11 +325,11 @@ pub fn exportToWav(node: *AudioNode, duration: f32, writer: anytype) !void {
     try writer.writeInt(u32, sample_rate * channels * 2, .little); // bytes per sec
     try writer.writeInt(u16, channels * 2, .little); // bytes per bloc
     try writer.writeInt(u16, 16, .little); // bits per sample
-    
+
     // Data block
     try writer.print("data", .{});
     try writer.writeInt(u32, data_size, .little);
-    
+
     var mem_buffer: [128 * 1024]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&mem_buffer);
     const allocator = fba.allocator();
